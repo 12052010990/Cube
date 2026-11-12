@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="id" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RasyaCube - Belajar Rubik 3x3 dari Nol hingga Mahir</title>
+
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#F0F7FF',
+                            100: '#E0F2FE',
+                            200: '#BAE6FD',
+                            300: '#7DD3FC',
+                            400: '#38BDF8',
+                            500: '#0EA5E9',
+                            600: '#0284C7',
+                            700: '#0369A1',
+                            900: '#0C4A6E',
+                        }
+                    },
+                    boxShadow: {
+                        'soft': '0 14px 38px -10px rgba(2, 132, 199, 0.15)',
+                        'card': '0 4px 20px -4px rgba(12, 74, 110, 0.07)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <style>
+        body {
+            background-color: #F0F7FF;
+            color: #334155;
+        }
+
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.88);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+        }
+
+        /* =========================================================
+           RUBIK 3D ENGINE: MUNGIL (140x140), CUBIE (44x44),
+           WARNA KLASIK STANDAR CERAH & FULL-BLEED
+           ========================================================= */
+        .cube-viewport {
+            width: 140px;
+            height: 140px;
+            perspective: 600px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+            cursor: grab;
+        }
+
+        .cube-viewport:active {
+            cursor: grabbing;
+        }
+
+        .cube-assembly {
+            width: 0;
+            height: 0;
+            position: relative;
+            transform-style: preserve-3d;
+            will-change: transform;
+        }
+
+        .cubie {
+            position: absolute;
+            width: 44px;
+            height: 44px;
+            left: -22px;
+            top: -22px;
+            transform-style: preserve-3d;
+            will-change: transform;
+        }
+
+        .cubie-face {
+            position: absolute;
+            width: 44px;
+            height: 44px;
+            border-radius: 4px;
+            box-sizing: border-box;
+            backface-visibility: hidden;
+            /* Warna penuh (full-bleed) dengan garis pemisah tipis gelap */
+            border: 1px solid #111827;
+            box-shadow:
+                inset 0 2px 5px rgba(255, 255, 255, 0.25),
+                inset 0 -2px 5px rgba(0, 0, 0, 0.22);
+        }
+
+        /* Posisi 6 sisi tiap cubie (setengah dari 44px = 22px) */
+        .face-front  { transform: rotateY(0deg) translateZ(22px); }
+        .face-back   { transform: rotateY(180deg) translateZ(22px); }
+        .face-right  { transform: rotateY(90deg) translateZ(22px); }
+        .face-left   { transform: rotateY(-90deg) translateZ(22px); }
+        .face-top    { transform: rotateX(90deg) translateZ(22px); }
+        .face-bottom { transform: rotateX(-90deg) translateZ(22px); }
+
+        /* Palet Warna Klasik/Standar Rubik's Cube yang Cerah, Tajam, dan Kontras */
+        .color-U { background-color: #FFFFFF; } /* Sisi Atas (U): Putih Cerah */
+        .color-D { background-color: #FFD500; } /* Sisi Bawah (D): Kuning Cerah */
+        .color-F { background-color: #009E60; } /* Sisi Depan (F): Hijau Cerah */
+        .color-B { background-color: #0051BA; } /* Sisi Belakang (B): Biru Cerah */
+        .color-R { background-color: #C41E3A; } /* Sisi Kanan (R): Merah Cerah */
+        .color-L { background-color: #FF5800; } /* Sisi Kiri (L): Oranye Cerah */
+        .color-core {
+            background-color: #111827;
+            border: none;
+            box-shadow: none;
+        }
+
+        /* Toast Notification */
+        #toast {
+            visibility: hidden;
+            opacity: 0;
+            transform: translateY(16px);
+            transition: all 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        #toast.show {
+            visibility: visible;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Modal Backdrop & Dialog Transition */
+        .modal-backdrop {
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.25s ease, visibility 0.25s ease;
+        }
+        .modal-backdrop.open {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-panel {
+            transform: scale(0.95) translateY(10px);
+            transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .modal-backdrop.open .modal-panel {
+            transform: scale(1) translateY(0);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #F0F7FF; }
+        ::-webkit-scrollbar-thumb { background: #7DD3FC; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #0EA5E9; }
+    </style>
+</head>
+<body class="font-sans antialiased selection:bg-brand-600 selection:text-white">
+
+    <!-- Toast Notifikasi -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-sm font-medium">
+        <i class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+        <span id="toast-message">Tersalin!</span>
+    </div>
+
+    <!-- Modal Materi Tutorial Detail -->
+    <div id="tutorial-modal" class="modal-backdrop fixed inset-0 z-50 bg-slate-900/45 backdrop-blur-xs flex items-center justify-center p-4" onclick="closeTutorialModalOnBackdrop(event)">
+        <div class="modal-panel bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-brand-100 overflow-hidden max-h-[88vh] flex flex-col">
+            <div class="px-6 py-5 bg-gradient-to-r from-brand-50 to-brand-100/80 border-b border-brand-100 flex items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <span id="modal-step-badge" class="w-9 h-9 rounded-xl bg-brand-600 text-white font-bold text-sm flex items-center justify-center">1</span>
+                    <h3 id="modal-step-title" class="text-lg sm:text-xl font-extrabold text-brand-900">Judul Tahapan</h3>
+                </div>
+                <button onclick="closeTutorialModal()" class="w-9 h-9 rounded-xl bg-white/80 hover:bg-white text-slate-500 hover:text-slate-800 flex items-center justify-center transition" aria-label="Tutup Modal">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div id="modal-step-body" class="p-6 overflow-y-auto space-y-4 text-sm sm:text-base text-slate-600 leading-relaxed">
+                <!-- Diisi dinamis oleh JS -->
+            </div>
+            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                <button id="modal-sim-btn" class="hidden px-4 py-2.5 rounded-xl bg-brand-100 hover:bg-brand-200 text-brand-900 text-xs font-bold transition">
+                    <i class="fa-solid fa-cube mr-1.5 text-brand-600"></i>Simulasikan Rumus di 3D
+                </button>
+                <div class="flex items-center gap-2.5 ml-auto">
+                    <button id="modal-complete-btn" class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs sm:text-sm font-bold transition">
+                        <i class="fa-solid fa-check mr-1.5"></i>Tandai Selesai
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         1. NAVBAR STICKY + PROGRESS BAR BELAJAR
+         ========================================================= -->
+    <header class="glass-nav fixed top-0 inset-x-0 z-40 border-b border-brand-100">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between py-3.5">
+                <!-- Logo -->
+                <a href="#home" class="flex items-center gap-2.5 group">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition">
+                        <i class="fa-solid fa-cube text-lg"></i>
+                    </div>
+                    <span class="text-xl sm:text-2xl font-extrabold tracking-tight text-brand-900">
+                        Rasya<span class="text-brand-600">Cube</span>
+                    </span>
+                </a>
+
+                <!-- Menu Desktop -->
+                <nav class="hidden lg:flex items-center gap-6 text-sm font-semibold text-slate-600">
+                    <a href="#home" class="hover:text-brand-600 transition">Home</a>
+                    <a href="#notasi" class="hover:text-brand-600 transition">Notasi</a>
+                    <a href="#tutorial" class="hover:text-brand-600 transition">Tutorial</a>
+                    <a href="#video" class="hover:text-brand-600 transition">Video</a>
+                    <a href="#rumus" class="hover:text-brand-600 transition">Rumus</a>
+                    <a href="#quiz" class="hover:text-brand-600 transition">Quiz</a>
+                    <a href="#about" class="hover:text-brand-600 transition">About</a>
+                </nav>
+
+                <!-- Progress & CTA -->
+                <div class="flex items-center gap-3">
+                    <a href="#tutorial" class="hidden sm:inline-flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-brand-50 border border-brand-200 text-brand-900 text-xs font-bold hover:bg-brand-100 transition" title="Progress Belajar Kamu">
+                        <i class="fa-solid fa-chart-pie text-brand-600"></i>
+                        <span>Progress: <span id="nav-progress-text" class="text-brand-600">0%</span></span>
+                        <span class="w-14 h-1.5 bg-brand-200 rounded-full overflow-hidden">
+                            <span id="nav-progress-mini-bar" class="block h-full bg-brand-600 rounded-full transition-all duration-500" style="width: 0%"></span>
+                        </span>
+                    </a>
+                    <a href="#notasi" class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold px-4 sm:px-5 py-2.5 rounded-xl shadow-sm transition">
+                        Mulai Belajar
+                    </a>
+                    <button id="mobile-menu-btn" onclick="toggleMobileMenu()" class="lg:hidden p-2.5 rounded-xl text-slate-600 hover:bg-brand-50" aria-label="Buka Menu">
+                        <i class="fa-solid fa-bars text-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Menu Mobile Dropdown -->
+            <div id="mobile-menu" class="hidden lg:hidden pb-4 pt-2 border-t border-brand-100">
+                <div class="flex flex-col space-y-2 text-sm font-semibold text-slate-700">
+                    <a href="#home" onclick="toggleMobileMenu()" class="px-3 py-2 rounded-lg hover:bg-brand-50 hover:text-brand-600">Home</a>
+                    <a href="#notasi" onclick="toggleMobileMenu()" class="px-3 py-2 rounded-lg hover:bg-brand-50 hover:text-brand-600">Notasi Rubik</a>
+                    <a href="#tutorial" onclick="toggleMobileMenu()" class="px-3 py-2 rounded-lg hover:bg-brand-50 hover:text-brand-600">Tutorial Lengkap</a>
+                    <a href="#video" onclick="toggleMobileMenu()" class="px-3 py-2 rounded-lg hover:bg-brand-50 hover:text-brand-600">Video Panduan</a>
+                    <a href="#rumus" onclick="toggleMobileMenu()" class="px-3 py-2 rounded-lg hover:bg-brand-50 hover:text-brand-600">Rumus 3x3</a>
+                    <a href="#quiz" onclick="toggleMobileMenu()" class="px-3 py-2 rounded-lg hover:bg-brand-50 hover:text-brand-600">Quiz Interaktif</a>
+                    <a href="#about" onclick="toggleMobileMenu()" class="px-3 py-2 rounded-lg hover:bg-brand-50 hover:text-brand-600">About</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- =========================================================
+         2. HERO SECTION DENGAN RUBIK 3D KLASIK & FITUR DIAMKAN RUBIK
+         ========================================================= -->
+    <section id="home" class="pt-28 pb-16 lg:pt-36 lg:pb-24 bg-gradient-to-b from-brand-50 via-brand-100/60 to-white overflow-hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+                
+                <!-- Kolom Teks Hero -->
+                <div class="lg:col-span-6 text-center lg:text-left">
+                    <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border border-brand-200 text-brand-600 font-semibold text-xs sm:text-sm mb-6 shadow-xs">
+                        <i class="fa-solid fa-sparkles"></i> Platform Belajar Rubik 3x3 Interaktif
+                    </div>
+                    <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-brand-900 tracking-tight leading-tight mb-5">
+                        Master Your <br>
+                        <span class="text-brand-600">Rubik’s Cube</span>
+                    </h1>
+                    <p class="text-base sm:text-lg text-slate-600 mb-8 max-w-xl mx-auto lg:mx-0 leading-relaxed">
+                        Belajar Rubik dari nol hingga mahir dengan cara yang menyenangkan. Pahami arti notasi putaran, ikuti langkah demi langkah dengan contoh nyata, tonton video, dan uji kemampuanmu!
+                    </p>
+                    <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3.5">
+                        <a href="#tutorial" class="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold shadow-soft transition transform hover:-translate-y-0.5 text-center">
+                            Mulai Belajar
+                        </a>
+                        <a href="#video" class="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-white hover:bg-brand-50 text-brand-600 border-2 border-brand-200 font-semibold transition text-center">
+                            <i class="fa-brands fa-youtube mr-1.5"></i>Tonton Video
+                        </a>
+                    </div>
+
+                    <!-- Highlight Ringkas -->
+                    <div class="mt-10 grid grid-cols-3 gap-4 max-w-md mx-auto lg:mx-0 pt-6 border-t border-brand-200/70">
+                        <div>
+                            <div class="text-xl sm:text-2xl font-extrabold text-brand-900">6 Tahap</div>
+                            <div class="text-xs text-slate-500 font-medium">Panduan Detail</div>
+                        </div>
+                        <div>
+                            <div class="text-xl sm:text-2xl font-extrabold text-brand-900">Video</div>
+                            <div class="text-xs text-slate-500 font-medium">Tutorial Visual</div>
+                        </div>
+                        <div>
+                            <div class="text-xl sm:text-2xl font-extrabold text-brand-900">3D Sim</div>
+                            <div class="text-xs text-slate-500 font-medium">Kontrol Penuh</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Kolom Rubik 3D CSS -->
+                <div class="lg:col-span-6 flex flex-col items-center">
+                    <div class="relative w-full max-w-md bg-white/90 backdrop-blur-sm rounded-3xl p-6 sm:p-7 border border-brand-200/80 shadow-soft">
+                        
+                        <!-- Status Putaran & Mode Diam/Berputar -->
+                        <div class="flex items-center justify-between gap-2 mb-3">
+                            <span id="status-pill" class="inline-flex items-center gap-2 text-xs font-bold px-3 py-1 rounded-full bg-brand-50 text-brand-900 border border-brand-200">
+                                <span id="status-indicator" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <span id="current-move-text">Berputar: U</span>
+                            </span>
+                            <span class="text-xs text-slate-400 font-medium">
+                                <i class="fa-solid fa-hand-pointer mr-1"></i> Geser rotasi 3D
+                            </span>
+                        </div>
+
+                        <!-- Container 3D Viewport Proporsional (140px x 140px) -->
+                        <div class="py-5 flex items-center justify-center">
+                            <div id="cube-viewport" class="cube-viewport">
+                                <div id="cube-assembly" class="cube-assembly"></div>
+                            </div>
+                        </div>
+
+                        <!-- Tombol Utama Diamkan / Gerakkan Rubik -->
+                        <div class="mb-3">
+                            <button id="freeze-toggle-btn" onclick="toggleFreezeMode()" class="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs sm:text-sm shadow-xs transition flex items-center justify-center gap-2 active:scale-[0.99]">
+                                <i id="freeze-icon" class="fa-solid fa-pause"></i>
+                                <span id="freeze-btn-label">Diamkan Rubik</span>
+                            </button>
+                        </div>
+
+                        <!-- Kontrol Gerakan Manual Rubik -->
+                        <div class="pt-3 border-t border-brand-100">
+                            <div class="grid grid-cols-6 gap-1.5 mb-2">
+                                <button onclick="enqueueMove('U')" class="py-2 rounded-lg bg-brand-50 hover:bg-brand-600 hover:text-white text-brand-900 font-mono font-bold text-xs transition active:scale-95">U</button>
+                                <button onclick="enqueueMove(&quot;U'&quot;)" class="py-2 rounded-lg bg-brand-50 hover:bg-brand-600 hover:text-white text-brand-900 font-mono font-bold text-xs transition active:scale-95">U'</button>
+                                <button onclick="enqueueMove('R')" class="py-2 rounded-lg bg-brand-50 hover:bg-brand-600 hover:text-white text-brand-900 font-mono font-bold text-xs transition active:scale-95">R</button>
+                                <button onclick="enqueueMove(&quot;R'&quot;)" class="py-2 rounded-lg bg-brand-50 hover:bg-brand-600 hover:text-white text-brand-900 font-mono font-bold text-xs transition active:scale-95">R'</button>
+                                <button onclick="enqueueMove('F')" class="py-2 rounded-lg bg-brand-50 hover:bg-brand-600 hover:text-white text-brand-900 font-mono font-bold text-xs transition active:scale-95">F</button>
+                                <button onclick="enqueueMove(&quot;F'&quot;)" class="py-2 rounded-lg bg-brand-50 hover:bg-brand-600 hover:text-white text-brand-900 font-mono font-bold text-xs transition active:scale-95">F'</button>
+                            </div>
+                            <div class="grid grid-cols-6 gap-1.5">
+                                <button onclick="enqueueMove('L')" class="py-2 rounded-lg bg-brand-50 hover:bg-brand-600 hover:text-white text-brand-900 font-mono font-bold text-xs transition active:scale-95">L</button>
+                                <button onclick="enqueueMove('D')" class="py-2 rounded-lg bg-brand-50 hover:bg-brand-600 hover:text-white text-brand-900 font-mono font-bold text-xs transition active:scale-95">D</button>
+                                <button onclick="enqueueMove('B')" class="py-2 rounded-lg bg-brand-50 hover:bg-brand-600 hover:text-white text-brand-900 font-mono font-bold text-xs transition active:scale-95">B</button>
+                                <button onclick="scrambleCube()" class="col-span-2 py-2 rounded-lg bg-sky-50 hover:bg-sky-600 hover:text-white text-sky-700 font-semibold text-xs transition active:scale-95">
+                                    <i class="fa-solid fa-shuffle mr-1"></i>Acak
+                                </button>
+                                <button onclick="resetCube()" class="py-2 rounded-lg bg-rose-50 hover:bg-rose-500 hover:text-white text-rose-700 font-semibold text-xs transition active:scale-95">Reset</button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================================================
+         3. MENGENAL NOTASI RUBIK
+         ========================================================= -->
+    <section id="notasi" class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center max-w-3xl mx-auto mb-14">
+                <span class="inline-block px-3.5 py-1 rounded-full bg-brand-50 text-brand-600 font-bold text-xs uppercase tracking-wider mb-3">Dasar Wajib</span>
+                <h2 class="text-3xl sm:text-4xl font-extrabold text-brand-900 mb-4">Mengenal Notasi Rubik 3x3</h2>
+                <p class="text-slate-600 text-base sm:text-lg">
+                    Notasi adalah bahasa standar untuk membaca rumus Rubik. Posisikan satu sisi menghadap langsung ke wajahmu sebagai <strong>Front (Depan)</strong>.
+                </p>
+            </div>
+
+            <!-- Penjelasan Arah Putaran -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                <div class="bg-brand-50/80 border border-brand-200 rounded-2xl p-6">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="w-10 h-10 rounded-xl bg-brand-600 text-white font-mono font-bold flex items-center justify-center text-lg">R</span>
+                        <h3 class="font-bold text-brand-900 text-lg">Huruf Biasa (90° Searah)</h3>
+                    </div>
+                    <p class="text-sm text-slate-600 leading-relaxed">
+                        Memutar lapisan tersebut <strong>90 derajat searah jarum jam (Clockwise)</strong> seolah-olah kamu melihat langsung ke sisi itu.
+                    </p>
+                </div>
+
+                <div class="bg-brand-50/80 border border-brand-200 rounded-2xl p-6">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="w-10 h-10 rounded-xl bg-brand-600 text-white font-mono font-bold flex items-center justify-center text-lg">R'</span>
+                        <h3 class="font-bold text-brand-900 text-lg">Tanda Petik / Aksen (')</h3>
+                    </div>
+                    <p class="text-sm text-slate-600 leading-relaxed">
+                        Dibaca <em>"R Prime"</em>. Memutar lapisan <strong>90 derajat berlawanan arah jarum jam (Counter-Clockwise)</strong>.
+                    </p>
+                </div>
+
+                <div class="bg-brand-50/80 border border-brand-200 rounded-2xl p-6">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="w-10 h-10 rounded-xl bg-brand-600 text-white font-mono font-bold flex items-center justify-center text-lg">R2</span>
+                        <h3 class="font-bold text-brand-900 text-lg">Angka 2 (Putar 180°)</h3>
+                    </div>
+                    <p class="text-sm text-slate-600 leading-relaxed">
+                        Memutar lapisan sebanyak <strong>2 kali putaran (180 derajat)</strong>. Arah searah maupun berlawanan menghasilkan posisi sama.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Kartu 6 Sisi Utama -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-6">
+                <!-- Sisi Kanan -->
+                <div class="bg-white border border-slate-200 hover:border-brand-400 rounded-2xl p-5 text-center shadow-card transition group">
+                    <div class="w-12 h-12 mx-auto rounded-xl bg-brand-100 text-brand-600 font-mono font-extrabold text-xl flex items-center justify-center mb-3 group-hover:bg-brand-600 group-hover:text-white transition">R</div>
+                    <h4 class="font-bold text-brand-900">Right (Kanan)</h4>
+                    <p class="text-xs text-slate-500 mt-1">R: ke atas<br>R': ke bawah</p>
+                    <button onclick="testNotation('R')" class="mt-3 text-xs font-semibold text-brand-600 hover:underline">Coba di 3D →</button>
+                </div>
+                <!-- Sisi Kiri -->
+                <div class="bg-white border border-slate-200 hover:border-brand-400 rounded-2xl p-5 text-center shadow-card transition group">
+                    <div class="w-12 h-12 mx-auto rounded-xl bg-brand-100 text-brand-600 font-mono font-extrabold text-xl flex items-center justify-center mb-3 group-hover:bg-brand-600 group-hover:text-white transition">L</div>
+                    <h4 class="font-bold text-brand-900">Left (Kiri)</h4>
+                    <p class="text-xs text-slate-500 mt-1">L: ke bawah<br>L': ke atas</p>
+                    <button onclick="testNotation('L')" class="mt-3 text-xs font-semibold text-brand-600 hover:underline">Coba di 3D →</button>
+                </div>
+                <!-- Sisi Atas -->
+                <div class="bg-white border border-slate-200 hover:border-brand-400 rounded-2xl p-5 text-center shadow-card transition group">
+                    <div class="w-12 h-12 mx-auto rounded-xl bg-brand-100 text-brand-600 font-mono font-extrabold text-xl flex items-center justify-center mb-3 group-hover:bg-brand-600 group-hover:text-white transition">U</div>
+                    <h4 class="font-bold text-brand-900">Up (Atas)</h4>
+                    <p class="text-xs text-slate-500 mt-1">U: ke kiri<br>U': ke kanan</p>
+                    <button onclick="testNotation('U')" class="mt-3 text-xs font-semibold text-brand-600 hover:underline">Coba di 3D →</button>
+                </div>
+                <!-- Sisi Bawah -->
+                <div class="bg-white border border-slate-200 hover:border-brand-400 rounded-2xl p-5 text-center shadow-card transition group">
+                    <div class="w-12 h-12 mx-auto rounded-xl bg-brand-100 text-brand-600 font-mono font-extrabold text-xl flex items-center justify-center mb-3 group-hover:bg-brand-600 group-hover:text-white transition">D</div>
+                    <h4 class="font-bold text-brand-900">Down (Bawah)</h4>
+                    <p class="text-xs text-slate-500 mt-1">D: ke kanan<br>D': ke kiri</p>
+                    <button onclick="testNotation('D')" class="mt-3 text-xs font-semibold text-brand-600 hover:underline">Coba di 3D →</button>
+                </div>
+                <!-- Sisi Depan -->
+                <div class="bg-white border border-slate-200 hover:border-brand-400 rounded-2xl p-5 text-center shadow-card transition group">
+                    <div class="w-12 h-12 mx-auto rounded-xl bg-brand-100 text-brand-600 font-mono font-extrabold text-xl flex items-center justify-center mb-3 group-hover:bg-brand-600 group-hover:text-white transition">F</div>
+                    <h4 class="font-bold text-brand-900">Front (Depan)</h4>
+                    <p class="text-xs text-slate-500 mt-1">F: searah jam<br>F': lawan jam</p>
+                    <button onclick="testNotation('F')" class="mt-3 text-xs font-semibold text-brand-600 hover:underline">Coba di 3D →</button>
+                </div>
+                <!-- Sisi Belakang -->
+                <div class="bg-white border border-slate-200 hover:border-brand-400 rounded-2xl p-5 text-center shadow-card transition group">
+                    <div class="w-12 h-12 mx-auto rounded-xl bg-brand-100 text-brand-600 font-mono font-extrabold text-xl flex items-center justify-center mb-3 group-hover:bg-brand-600 group-hover:text-white transition">B</div>
+                    <h4 class="font-bold text-brand-900">Back (Belakang)</h4>
+                    <p class="text-xs text-slate-500 mt-1">B: searah jam blkg<br>B': lawan jam blkg</p>
+                    <button onclick="testNotation('B')" class="mt-3 text-xs font-semibold text-brand-600 hover:underline">Coba di 3D →</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================================================
+         4. TUTORIAL SECTION (6 TAHAP DETAIL + MODAL + PROGRESS)
+         ========================================================= -->
+    <section id="tutorial" class="py-20 bg-brand-50/80 border-y border-brand-100">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center max-w-3xl mx-auto mb-12">
+                <span class="inline-block px-3.5 py-1 rounded-full bg-white text-brand-600 font-bold text-xs uppercase tracking-wider mb-3 border border-brand-200">Metode Layer-by-Layer</span>
+                <h2 class="text-3xl sm:text-4xl font-extrabold text-brand-900 mb-4">Belajar Rubik dari Dasar</h2>
+                <p class="text-slate-600 text-base sm:text-lg">
+                    Ikuti 6 tahapan sistematis di bawah ini. Buka panduan lengkap tiap tahap untuk melihat contoh kasus dan simulasi 3D, lalu tandai selesai.
+                </p>
+            </div>
+
+            <!-- Progress Bar Card -->
+            <div class="bg-white rounded-2xl p-6 shadow-card border border-brand-100 mb-10">
+                <div class="flex items-center justify-between mb-2.5">
+                    <span class="text-sm font-bold text-brand-900"><i class="fa-solid fa-trophy text-amber-400 mr-2"></i>Progress Belajar Kamu</span>
+                    <span id="tutorial-progress-pct" class="text-lg font-extrabold text-brand-600">0%</span>
+                </div>
+                <div class="w-full h-3 bg-brand-100 rounded-full overflow-hidden">
+                    <div id="tutorial-progress-bar" class="h-full bg-gradient-to-r from-brand-400 via-brand-500 to-brand-600 rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+                <p id="tutorial-progress-note" class="text-xs text-slate-500 mt-2">0 dari 6 tahapan selesai dipelajari.</p>
+            </div>
+
+            <!-- Daftar 6 Tahap Tutorial -->
+            <div class="space-y-6">
+
+                <!-- Tahap 1 -->
+                <article class="bg-white rounded-3xl p-6 sm:p-8 shadow-card border border-slate-100 hover:border-brand-200 transition">
+                    <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="w-10 h-10 rounded-xl bg-brand-600 text-white font-bold flex items-center justify-center">1</span>
+                            <h3 class="text-xl sm:text-2xl font-bold text-brand-900">Pengenalan Rubik 3x3 & Jenis Bagiannya</h3>
+                        </div>
+                        <div class="flex items-center gap-2.5">
+                            <button onclick="openTutorialModal(1)" class="px-3.5 py-1.5 rounded-xl bg-brand-100/80 hover:bg-brand-200 text-brand-900 text-xs font-bold transition">
+                                <i class="fa-solid fa-book-open mr-1.5 text-brand-600"></i>Panduan Lengkap
+                            </button>
+                            <label class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-900 text-xs font-bold cursor-pointer transition">
+                                <input type="checkbox" data-step="1" class="step-checkbox w-4 h-4 text-brand-600 rounded" onchange="updateLearningProgress()">
+                                <span>Selesai</span>
+                            </label>
+                        </div>
+                    </div>
+                    <p class="text-slate-600 text-sm sm:text-base leading-relaxed mb-4">
+                        Rubik 3x3 terdiri dari 26 bagian luar yang terbagi menjadi 3 jenis keping. Memahami sifat tiap keping adalah kunci utama:
+                    </p>
+                    <div class="grid sm:grid-cols-3 gap-4 text-sm">
+                        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/70">
+                            <div class="font-bold text-brand-900 mb-1"><i class="fa-solid fa-bullseye text-brand-600 mr-1.5"></i>6 Center (Tengah)</div>
+                            <p class="text-slate-600 text-xs leading-relaxed">Hanya memiliki <strong>1 warna</strong> dan posisinya <strong>tidak pernah berpindah</strong>.</p>
+                        </div>
+                        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/70">
+                            <div class="font-bold text-brand-900 mb-1"><i class="fa-solid fa-plus text-brand-600 mr-1.5"></i>12 Edge (Tepi)</div>
+                            <p class="text-slate-600 text-xs leading-relaxed">Memiliki <strong>2 warna</strong> dan berada di antara dua center (membentuk tanda tambah).</p>
+                        </div>
+                        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/70">
+                            <div class="font-bold text-brand-900 mb-1"><i class="fa-solid fa-vector-square text-brand-600 mr-1.5"></i>8 Corner (Sudut)</div>
+                            <p class="text-slate-600 text-xs leading-relaxed">Memiliki <strong>3 warna</strong> dan berada di pojok-pojok kubus.</p>
+                        </div>
+                    </div>
+                </article>
+
+                <!-- Tahap 2 -->
+                <article class="bg-white rounded-3xl p-6 sm:p-8 shadow-card border border-slate-100 hover:border-brand-200 transition">
+                    <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="w-10 h-10 rounded-xl bg-brand-600 text-white font-bold flex items-center justify-center">2</span>
+                            <h3 class="text-xl sm:text-2xl font-bold text-brand-900">Mengenal Notasi & Kombinasi Gerakan</h3>
+                        </div>
+                        <div class="flex items-center gap-2.5">
+                            <button onclick="openTutorialModal(2)" class="px-3.5 py-1.5 rounded-xl bg-brand-100/80 hover:bg-brand-200 text-brand-900 text-xs font-bold transition">
+                                <i class="fa-solid fa-book-open mr-1.5 text-brand-600"></i>Panduan Lengkap
+                            </button>
+                            <label class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-900 text-xs font-bold cursor-pointer transition">
+                                <input type="checkbox" data-step="2" class="step-checkbox w-4 h-4 text-brand-600 rounded" onchange="updateLearningProgress()">
+                                <span>Selesai</span>
+                            </label>
+                        </div>
+                    </div>
+                    <p class="text-slate-600 text-sm sm:text-base leading-relaxed mb-4">
+                        Sebelum masuk ke penyusunan warna, latih jari kamu melakukan kombinasi 4 gerakan paling terkenal di dunia cubing bernama <strong>Sexy Move</strong>:
+                    </p>
+                    <div class="bg-brand-50 rounded-2xl p-5 border border-brand-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <div class="text-xs font-bold text-brand-600 uppercase mb-1">Contoh Latihan Dasar</div>
+                            <code class="text-lg sm:text-xl font-mono font-extrabold text-brand-900">R U R' U'</code>
+                            <p class="text-xs text-slate-600 mt-1">Kanan naik (R) → Atas ke kiri (U) → Kanan turun (R') → Atas ke kanan (U').</p>
+                        </div>
+                        <button onclick="runDemoAlgorithm(['R','U',&quot;R'&quot;,&quot;U'&quot;])" class="px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shrink-0 transition">
+                            <i class="fa-solid fa-play mr-1.5"></i>Simulasikan di 3D
+                        </button>
+                    </div>
+                </article>
+
+                <!-- Tahap 3 -->
+                <article class="bg-white rounded-3xl p-6 sm:p-8 shadow-card border border-slate-100 hover:border-brand-200 transition">
+                    <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="w-10 h-10 rounded-xl bg-brand-600 text-white font-bold flex items-center justify-center">3</span>
+                            <h3 class="text-xl sm:text-2xl font-bold text-brand-900">Membuat White Cross (Tanda Tambah Putih)</h3>
+                        </div>
+                        <div class="flex items-center gap-2.5">
+                            <button onclick="openTutorialModal(3)" class="px-3.5 py-1.5 rounded-xl bg-brand-100/80 hover:bg-brand-200 text-brand-900 text-xs font-bold transition">
+                                <i class="fa-solid fa-book-open mr-1.5 text-brand-600"></i>Panduan Lengkap
+                            </button>
+                            <label class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-900 text-xs font-bold cursor-pointer transition">
+                                <input type="checkbox" data-step="3" class="step-checkbox w-4 h-4 text-brand-600 rounded" onchange="updateLearningProgress()">
+                                <span>Selesai</span>
+                            </label>
+                        </div>
+                    </div>
+                    <p class="text-slate-600 text-sm sm:text-base leading-relaxed mb-4">
+                        Buat tanda silang putih di sisi bawah dengan memastikan warna samping tiap edge putih sejajar dengan center di sekitarnya. Gunakan cara termudah yaitu <strong>Metode Daisy</strong>:
+                    </p>
+                    <ol class="list-decimal list-inside space-y-2 text-sm text-slate-700 bg-slate-50 p-5 rounded-2xl border border-slate-200/70">
+                        <li>Posisikan <strong>Center Kuning</strong> menghadap ke atas (U).</li>
+                        <li>Naikkan 4 keping <strong>Edge Putih</strong> mengelilingi center kuning hingga menyerupai bunga aster (Daisy).</li>
+                        <li>Putar lapisan atas (<code class="font-mono text-brand-600 font-bold">U</code>) hingga warna tepi sejajar dengan Centernya, lalu putar <code class="font-mono text-brand-600 font-bold">F2</code> ke dasar.</li>
+                    </ol>
+                </article>
+
+                <!-- Tahap 4 -->
+                <article class="bg-white rounded-3xl p-6 sm:p-8 shadow-card border border-slate-100 hover:border-brand-200 transition">
+                    <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="w-10 h-10 rounded-xl bg-brand-600 text-white font-bold flex items-center justify-center">4</span>
+                            <h3 class="text-xl sm:text-2xl font-bold text-brand-900">Menyelesaikan First Layer</h3>
+                        </div>
+                        <div class="flex items-center gap-2.5">
+                            <button onclick="openTutorialModal(4)" class="px-3.5 py-1.5 rounded-xl bg-brand-100/80 hover:bg-brand-200 text-brand-900 text-xs font-bold transition">
+                                <i class="fa-solid fa-book-open mr-1.5 text-brand-600"></i>Panduan Lengkap
+                            </button>
+                            <label class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-900 text-xs font-bold cursor-pointer transition">
+                                <input type="checkbox" data-step="4" class="step-checkbox w-4 h-4 text-brand-600 rounded" onchange="updateLearningProgress()">
+                                <span>Selesai</span>
+                            </label>
+                        </div>
+                    </div>
+                    <p class="text-slate-600 text-sm sm:text-base leading-relaxed mb-4">
+                        Masukkan 4 keping <strong>Corner Putih</strong> ke sudut bawah yang sesuai agar seluruh sisi bawah berwarna putih dan lapisan pertama rata menggunakan Sexy Move (<code class="font-mono font-bold text-brand-600">R U R' U'</code>).
+                    </p>
+                </article>
+
+                <!-- Tahap 5 -->
+                <article class="bg-white rounded-3xl p-6 sm:p-8 shadow-card border border-slate-100 hover:border-brand-200 transition">
+                    <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="w-10 h-10 rounded-xl bg-brand-600 text-white font-bold flex items-center justify-center">5</span>
+                            <h3 class="text-xl sm:text-2xl font-bold text-brand-900">Menyelesaikan Second Layer</h3>
+                        </div>
+                        <div class="flex items-center gap-2.5">
+                            <button onclick="openTutorialModal(5)" class="px-3.5 py-1.5 rounded-xl bg-brand-100/80 hover:bg-brand-200 text-brand-900 text-xs font-bold transition">
+                                <i class="fa-solid fa-book-open mr-1.5 text-brand-600"></i>Panduan Lengkap
+                            </button>
+                            <label class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-900 text-xs font-bold cursor-pointer transition">
+                                <input type="checkbox" data-step="5" class="step-checkbox w-4 h-4 text-brand-600 rounded" onchange="updateLearningProgress()">
+                                <span>Selesai</span>
+                            </label>
+                        </div>
+                    </div>
+                    <p class="text-slate-600 text-sm sm:text-base leading-relaxed mb-4">
+                        Cari keping edge tanpa warna kuning di atas, sejajarkan membentuk huruf "T" terbalik, lalu gunakan rumus memasukkan ke Kanan atau Kiri.
+                    </p>
+                </article>
+
+                <!-- Tahap 6 -->
+                <article class="bg-white rounded-3xl p-6 sm:p-8 shadow-card border border-slate-100 hover:border-brand-200 transition">
+                    <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+                        <div class="flex items-center gap-3">
+                            <span class="w-10 h-10 rounded-xl bg-brand-600 text-white font-bold flex items-center justify-center">6</span>
+                            <h3 class="text-xl sm:text-2xl font-bold text-brand-900">Menyelesaikan Last Layer</h3>
+                        </div>
+                        <div class="flex items-center gap-2.5">
+                            <button onclick="openTutorialModal(6)" class="px-3.5 py-1.5 rounded-xl bg-brand-100/80 hover:bg-brand-200 text-brand-900 text-xs font-bold transition">
+                                <i class="fa-solid fa-book-open mr-1.5 text-brand-600"></i>Panduan Lengkap
+                            </button>
+                            <label class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-900 text-xs font-bold cursor-pointer transition">
+                                <input type="checkbox" data-step="6" class="step-checkbox w-4 h-4 text-brand-600 rounded" onchange="updateLearningProgress()">
+                                <span>Selesai</span>
+                            </label>
+                        </div>
+                    </div>
+                    <p class="text-slate-600 text-sm sm:text-base leading-relaxed mb-4">
+                        Bentuk Yellow Cross, ratakan atap kuning dengan Sune, lalu rapikan sisi samping menggunakan rumus permutasi akhir!
+                    </p>
+                </article>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================================================
+         5. VIDEO TUTORIAL SECTION
+         ========================================================= -->
+    <section id="video" class="py-20 bg-white border-b border-brand-100">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center max-w-3xl mx-auto mb-12">
+                <span class="inline-block px-3.5 py-1 rounded-full bg-brand-50 text-brand-600 font-bold text-xs uppercase tracking-wider mb-3">Belajar Visual</span>
+                <h2 class="text-3xl sm:text-4xl font-extrabold text-brand-900 mb-4">Video Tutorial Pilihan</h2>
+                <p class="text-slate-600 text-base sm:text-lg">
+                    Lebih suka menonton? Saksikan panduan video ini untuk memahami bagaimana cara kerja pergerakan Rubik secara langsung di dunia nyata.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Video 1 -->
+                <div class="bg-white rounded-3xl p-5 shadow-card border border-brand-100 hover:border-brand-300 transition-colors duration-300 flex flex-col">
+                    <div class="w-full aspect-video rounded-2xl overflow-hidden bg-slate-100 mb-5 relative">
+                        <iframe class="absolute top-0 left-0 w-full h-full" src="https://www.youtube.com/embed/7Ron6MN45LY" title="Cara Bermain Rubik 3x3 Untuk Pemula" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+                    </div>
+                    <div class="px-2 pb-2 flex-grow">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-600">Bagian 1</span>
+                            <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">Pemula</span>
+                        </div>
+                        <h3 class="font-bold text-xl text-brand-900 mb-2 leading-tight">Dasar & Layer Pertama (Cross to F2L)</h3>
+                        <p class="text-sm text-slate-600 leading-relaxed">Panduan visual yang sangat jelas mengenai pengenalan bagian-bagian rubik, notasi dasar, dan cara membentuk fondasi cross di bawah.</p>
+                    </div>
+                </div>
+
+                <!-- Video 2 -->
+                <div class="bg-white rounded-3xl p-5 shadow-card border border-brand-100 hover:border-brand-300 transition-colors duration-300 flex flex-col">
+                    <div class="w-full aspect-video rounded-2xl overflow-hidden bg-slate-100 mb-5 relative">
+                        <iframe class="absolute top-0 left-0 w-full h-full" src="https://www.youtube.com/embed/R-R0KrXvWbc" title="Cara Bermain Rubik 3x3 Untuk Pemula Lanjutan" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+                    </div>
+                    <div class="px-2 pb-2 flex-grow">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-600">Bagian 2</span>
+                            <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">Penyelesaian</span>
+                        </div>
+                        <h3 class="font-bold text-xl text-brand-900 mb-2 leading-tight">Menyelesaikan Last Layer (OLL & PLL)</h3>
+                        <p class="text-sm text-slate-600 leading-relaxed">Melanjutkan dari layer kedua hingga lapisan terakhir (atap). Menunjukkan teknik Sune dan penyusunan akhir dengan rumus sederhana.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================================================
+         6. FORMULA / RUMUS SECTION
+         ========================================================= -->
+    <section id="rumus" class="py-20 bg-brand-50/40">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center max-w-3xl mx-auto mb-12">
+                <span class="inline-block px-3.5 py-1 rounded-full bg-brand-50 text-brand-600 font-bold text-xs uppercase tracking-wider mb-3">Cheat Sheet</span>
+                <h2 class="text-3xl sm:text-4xl font-extrabold text-brand-900 mb-4">Kumpulan Rumus Rubik 3x3</h2>
+                <p class="text-slate-600 text-base sm:text-lg">
+                    Daftar algoritma esensial dari level pemula hingga transisi ke metode cepat (CFOP). Klik tombol salin untuk menyalin rumus.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                
+                <!-- Card Rumus 1 -->
+                <div class="bg-white rounded-2xl p-6 border border-slate-200 hover:border-brand-400 shadow-card transition flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between gap-2 mb-2">
+                            <h3 class="font-bold text-lg text-brand-900">Sexy Move (Trigger Dasar)</h3>
+                            <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-600">Pemula</span>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4">Memasukkan corner putih ke lantai pertama dan menjadi dasar banyak algoritma lain.</p>
+                    </div>
+                    <div class="flex items-center justify-between gap-2 bg-brand-50 px-4 py-3 rounded-xl border border-brand-100">
+                        <code class="font-mono font-bold text-brand-900 text-base">R U R' U'</code>
+                        <button onclick="copyFormula(&quot;R U R' U'&quot;)" class="px-3 py-1.5 rounded-lg bg-white hover:bg-brand-600 hover:text-white text-brand-600 text-xs font-bold shadow-xs transition">
+                            <i class="fa-regular fa-copy mr-1"></i>Copy
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Card Rumus 2 -->
+                <div class="bg-white rounded-2xl p-6 border border-slate-200 hover:border-brand-400 shadow-card transition flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between gap-2 mb-2">
+                            <h3 class="font-bold text-lg text-brand-900">Sledgehammer</h3>
+                            <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-600">Pemula</span>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4">Mengubah orientasi edge atas saat membuat Yellow Cross atau memasukkan pasangan F2L.</p>
+                    </div>
+                    <div class="flex items-center justify-between gap-2 bg-brand-50 px-4 py-3 rounded-xl border border-brand-100">
+                        <code class="font-mono font-bold text-brand-900 text-base">R' F R F'</code>
+                        <button onclick="copyFormula(&quot;R' F R F'&quot;)" class="px-3 py-1.5 rounded-lg bg-white hover:bg-brand-600 hover:text-white text-brand-600 text-xs font-bold shadow-xs transition">
+                            <i class="fa-regular fa-copy mr-1"></i>Copy
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Card Rumus 3 -->
+                <div class="bg-white rounded-2xl p-6 border border-slate-200 hover:border-brand-400 shadow-card transition flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between gap-2 mb-2">
+                            <h3 class="font-bold text-lg text-brand-900">Yellow Cross (OLL Edge)</h3>
+                            <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-600">Last Layer</span>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4">Membentuk pola tanda tambah (+) kuning dari pola titik, huruf L kecil, atau garis lurus.</p>
+                    </div>
+                    <div class="flex items-center justify-between gap-2 bg-brand-50 px-4 py-3 rounded-xl border border-brand-100">
+                        <code class="font-mono font-bold text-brand-900 text-base">F R U R' U' F'</code>
+                        <button onclick="copyFormula(&quot;F R U R' U' F'&quot;)" class="px-3 py-1.5 rounded-lg bg-white hover:bg-brand-600 hover:text-white text-brand-600 text-xs font-bold shadow-xs transition">
+                            <i class="fa-regular fa-copy mr-1"></i>Copy
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Card Rumus 4 -->
+                <div class="bg-white rounded-2xl p-6 border border-slate-200 hover:border-brand-400 shadow-card transition flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between gap-2 mb-2">
+                            <h3 class="font-bold text-lg text-brand-900">Sune (OLL Corner)</h3>
+                            <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-600">Last Layer</span>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4">Meratakan seluruh warna kuning di sisi atas dari bentuk pola ikan (Fish pattern).</p>
+                    </div>
+                    <div class="flex items-center justify-between gap-2 bg-brand-50 px-4 py-3 rounded-xl border border-brand-100">
+                        <code class="font-mono font-bold text-brand-900 text-base">R U R' U R U2 R'</code>
+                        <button onclick="copyFormula(&quot;R U R' U R U2 R'&quot;)" class="px-3 py-1.5 rounded-lg bg-white hover:bg-brand-600 hover:text-white text-brand-600 text-xs font-bold shadow-xs transition">
+                            <i class="fa-regular fa-copy mr-1"></i>Copy
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================================================
+         7. QUIZ SECTION INTERAKTIF (5 SOAL + PEMBAHASAN)
+         ========================================================= -->
+    <section id="quiz" class="py-20 bg-gradient-to-b from-brand-50 to-white border-t border-brand-100">
+        <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <div class="w-14 h-14 rounded-2xl bg-brand-600 text-white text-2xl flex items-center justify-center mx-auto mb-4 shadow-soft">
+                    <i class="fa-solid fa-brain"></i>
+                </div>
+                <h2 class="text-3xl sm:text-4xl font-extrabold text-brand-900 mb-3">Quiz Interaktif RasyaCube</h2>
+                <p class="text-slate-600 text-base sm:text-lg">Uji pemahamanmu tentang bagian Rubik, arti notasi, dan urutan penyelesaian.</p>
+            </div>
+
+            <div class="bg-white rounded-3xl p-6 sm:p-10 shadow-soft border border-brand-100">
+                <form id="quiz-form" onsubmit="handleQuizSubmit(event)" class="space-y-8">
+                    <!-- Soal 1 -->
+                    <div>
+                        <p class="font-bold text-brand-900 mb-3">1. Apa arti dari notasi <code class="font-mono text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded">U'</code> pada Rubik 3x3?</p>
+                        <div class="space-y-2.5 text-sm">
+                            <label class="quiz-option flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 cursor-pointer hover:bg-brand-50 transition">
+                                <input type="radio" name="q1" value="a" required class="w-4 h-4 text-brand-600">
+                                <span>Lapisan atas diputar 90° searah jarum jam</span>
+                            </label>
+                            <label class="quiz-option flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 cursor-pointer hover:bg-brand-50 transition">
+                                <input type="radio" name="q1" value="b" class="w-4 h-4 text-brand-600">
+                                <span>Lapisan atas diputar 90° berlawanan arah jarum jam</span>
+                            </label>
+                            <label class="quiz-option flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 cursor-pointer hover:bg-brand-50 transition">
+                                <input type="radio" name="q1" value="c" class="w-4 h-4 text-brand-600">
+                                <span>Lapisan bawah diputar 180 derajat</span>
+                            </label>
+                        </div>
+                    </div>
+                    <!-- Soal 2 -->
+                    <div>
+                        <p class="font-bold text-brand-900 mb-3">2. Bagian Rubik manakah yang memiliki 3 warna sekaligus?</p>
+                        <div class="space-y-2.5 text-sm">
+                            <label class="quiz-option flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 cursor-pointer hover:bg-brand-50 transition">
+                                <input type="radio" name="q2" value="a" required class="w-4 h-4 text-brand-600">
+                                <span>Center (Tengah)</span>
+                            </label>
+                            <label class="quiz-option flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 cursor-pointer hover:bg-brand-50 transition">
+                                <input type="radio" name="q2" value="b" class="w-4 h-4 text-brand-600">
+                                <span>Edge (Tepi)</span>
+                            </label>
+                            <label class="quiz-option flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 cursor-pointer hover:bg-brand-50 transition">
+                                <input type="radio" name="q2" value="c" class="w-4 h-4 text-brand-600">
+                                <span>Corner (Sudut)</span>
+                            </label>
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full py-4 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-base shadow-soft transition">
+                        Periksa Skor & Pembahasan
+                    </button>
+                </form>
+
+                <!-- Hasil Quiz -->
+                <div id="quiz-result" class="hidden">
+                    <div class="text-center p-6 rounded-2xl bg-brand-50 border border-brand-200 mb-6">
+                        <div class="text-xs font-bold uppercase tracking-wider text-brand-600 mb-1">Hasil Evaluasi</div>
+                        <div class="text-4xl font-extrabold text-brand-900 mb-2">Skor: <span id="quiz-score" class="text-brand-600">0/5</span></div>
+                        <p id="quiz-feedback" class="text-sm text-slate-600 max-w-md mx-auto"></p>
+                    </div>
+                    <div id="quiz-explanations" class="space-y-3 mb-6 text-sm"></div>
+                    <button onclick="resetQuiz()" class="w-full py-3.5 rounded-xl bg-white hover:bg-brand-50 text-brand-600 border-2 border-brand-600 font-bold transition">
+                        Ulangi Quiz
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================================================
+         8. ABOUT & FOOTER
+         ========================================================= -->
+    <section id="about" class="py-16 bg-white border-t border-slate-100">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <span class="inline-block px-3.5 py-1 rounded-full bg-brand-50 text-brand-600 font-bold text-xs uppercase tracking-wider mb-3">Tentang Kami</span>
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-brand-900 mb-4">Mengapa Belajar di RasyaCube?</h2>
+            <p class="text-slate-600 text-base leading-relaxed max-w-2xl mx-auto">
+                RasyaCube hadir sebagai media edukasi modern yang dirancang khusus agar siapa saja dapat memahami logika permainan Rubik's Cube tanpa merasa kewalahan. Kombinasi simulasi 3D, materi yang mudah dicerna, dan video tutorial visual membuat belajar terasa menyenangkan.
+            </p>
+        </div>
+    </section>
+
+    <footer class="bg-brand-50 border-t border-brand-100 py-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-brand-600 text-white flex items-center justify-center">
+                    <i class="fa-solid fa-cube text-sm"></i>
+                </div>
+                <span class="font-extrabold text-lg text-brand-900">Rasya<span class="text-brand-600">Cube</span></span>
+            </div>
+            <div class="flex flex-wrap justify-center gap-6 text-xs font-semibold text-slate-600">
+                <a href="#home" class="hover:text-brand-600 transition">Home</a>
+                <a href="#tutorial" class="hover:text-brand-600 transition">Tutorial</a>
+                <a href="#video" class="hover:text-brand-600 transition">Video</a>
+                <a href="#rumus" class="hover:text-brand-600 transition">Rumus</a>
+            </div>
+            <p class="text-xs text-slate-500">&copy; 2026 RasyaCube. Belajar Rubik Jadi Menyenangkan.</p>
+        </div>
+    </footer>
+
+    <!-- =========================================================
+         JAVASCRIPT: 3D RUBIK ENGINE (WARNA KLASIK + FREEZE MODE)
+         ========================================================= -->
+    <script>
+        // 1. Mobile Menu Toggle
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobile-menu');
+            menu.classList.toggle('hidden');
+        }
+
+        // 2. Toast Notification Helper
+        function showToast(text) {
+            const toast = document.getElementById('toast');
+            const msg = document.getElementById('toast-message');
+            msg.textContent = text;
+            toast.classList.add('show');
+            clearTimeout(window._toastTimer);
+            window._toastTimer = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2500);
+        }
+
+        // 3. Copy Formula Helper
+        function copyFormula(formula) {
+            const tempInput = document.createElement('textarea');
+            tempInput.value = formula;
+            tempInput.style.position = 'fixed';
+            tempInput.style.opacity = '0';
+            document.body.appendChild(tempInput);
+            tempInput.focus();
+            tempInput.select();
+            try {
+                document.execCommand('copy');
+                showToast('Rumus disalin: ' + formula);
+            } catch (e) {
+                showToast('Gagal menyalin rumus');
+            }
+            document.body.removeChild(tempInput);
+        }
+
+        // =========================================================
+        // 4. RUBIK 3D ENGINE (140x140 VIEWPORT, 44x44 CUBIE, LERP 60fps)
+        // =========================================================
+        const cubeViewport = document.getElementById('cube-viewport');
+        const cubeAssembly = document.getElementById('cube-assembly');
+        const currentMoveText = document.getElementById('current-move-text');
+        const statusIndicator = document.getElementById('status-indicator');
+        const freezeToggleBtn = document.getElementById('freeze-toggle-btn');
+        const freezeBtnLabel = document.getElementById('freeze-btn-label');
+        const freezeIcon = document.getElementById('freeze-icon');
+
+        const GRID_STEP = 45.5; // 44px cubie + 1.5px garis pemisah
+        let cubieList = [];
+        let moveQueue = [];
+        let isTurning = false;
+        let isFrozen = false; 
+        let autoTimer = null;
+
+        // Rotasi Kamera (Lerp)
+        let currentRotX = -25;
+        let currentRotY = -36;
+        let targetRotX = -25;
+        let targetRotY = -36;
+        let isPointerDown = false;
+        let lastPointerX = 0;
+        let lastPointerY = 0;
+        let lastFrameTime = performance.now();
+
+        const autoMovesSequence = ['U', 'R', 'F', "F'", "R'", "U'", 'R', 'U', "R'", "U'", 'L', 'D', "D'", "L'", 'B', "B'"];
+        let autoSeqIndex = 0;
+
+        function matMul(a, b) {
+            const res = new Array(16).fill(0);
+            for (let c = 0; c < 4; c++) {
+                for (let r = 0; r < 4; r++) {
+                    for (let k = 0; k < 4; k++) {
+                        res[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k];
+                    }
+                }
+            }
+            return res;
+        }
+
+        function matTranslate(x, y, z) {
+            return [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1];
+        }
+
+        function matRotate(axis, deg) {
+            const rad = (deg * Math.PI) / 180;
+            const c = Math.cos(rad);
+            const s = Math.sin(rad);
+            if (axis === 'x') return [1, 0, 0, 0, 0, c, s, 0, 0, -s, c, 0, 0, 0, 0, 1];
+            if (axis === 'y') return [c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1];
+            return [c, s, 0, 0, -s, c, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+        }
+
+        function toMatrix3dString(m) {
+            return `matrix3d(${m.map(v => Number(v.toFixed(6))).join(',')})`;
+        }
+
+        function buildRubiksCube() {
+            cubeAssembly.innerHTML = '';
+            cubieList = [];
+
+            for (let x = -1; x <= 1; x++) {
+                for (let y = -1; y <= 1; y++) {
+                    for (let z = -1; z <= 1; z++) {
+                        const cubieEl = document.createElement('div');
+                        cubieEl.className = 'cubie';
+
+                        const facesConfig = [
+                            { cls: 'face-front',  color: z === 1  ? 'color-F' : 'color-core' },
+                            { cls: 'face-back',   color: z === -1 ? 'color-B' : 'color-core' },
+                            { cls: 'face-right',  color: x === 1  ? 'color-R' : 'color-core' },
+                            { cls: 'face-left',   color: x === -1 ? 'color-L' : 'color-core' },
+                            { cls: 'face-top',    color: y === -1 ? 'color-U' : 'color-core' },
+                            { cls: 'face-bottom', color: y === 1  ? 'color-D' : 'color-core' } 
+                        ];
+
+                        facesConfig.forEach(fc => {
+                            const faceDiv = document.createElement('div');
+                            faceDiv.className = `cubie-face ${fc.cls} ${fc.color}`;
+                            cubieEl.appendChild(faceDiv);
+                        });
+
+                        const initMatrix = matTranslate(x * GRID_STEP, y * GRID_STEP, z * GRID_STEP);
+                        cubieEl.style.transform = toMatrix3dString(initMatrix);
+                        cubeAssembly.appendChild(cubieEl);
+
+                        cubieList.push({ el: cubieEl, x: x, y: y, z: z, matrix: initMatrix });
+                    }
+                }
+            }
+        }
+
+        function startOrbitLoop(now) {
+            const dt = Math.min((now - lastFrameTime) / 1000, 0.05);
+            lastFrameTime = now;
+
+            if (!isFrozen && !isPointerDown) {
+                targetRotY += 15 * dt;
+                const gentleFloatX = -24 + Math.sin(now * 0.00085) * 5;
+                targetRotX += (gentleFloatX - targetRotX) * 0.03;
+            }
+
+            const smoothFactor = 1 - Math.exp(-12 * dt);
+            currentRotX += (targetRotX - currentRotX) * smoothFactor;
+            currentRotY += (targetRotY - currentRotY) * smoothFactor;
+
+            cubeAssembly.style.transform = `rotateX(${currentRotX.toFixed(3)}deg) rotateY(${currentRotY.toFixed(3)}deg)`;
+            requestAnimationFrame(startOrbitLoop);
+        }
+
+        function getMoveSpec(notation) {
+            switch (notation) {
+                case 'U':  return { axis: 'y', layer: -1, angle: -90 };
+                case "U'": return { axis: 'y', layer: -1, angle: 90 };
+                case 'D':  return { axis: 'y', layer: 1,  angle: 90 };
+                case "D'": return { axis: 'y', layer: 1,  angle: -90 };
+                case 'R':  return { axis: 'x', layer: 1,  angle: 90 };
+                case "R'": return { axis: 'x', layer: 1,  angle: -90 };
+                case 'L':  return { axis: 'x', layer: -1, angle: -90 };
+                case "L'": return { axis: 'x', layer: -1, angle: 90 };
+                case 'F':  return { axis: 'z', layer: 1,  angle: 90 };
+                case "F'": return { axis: 'z', layer: 1,  angle: -90 };
+                case 'B':  return { axis: 'z', layer: -1, angle: -90 };
+                case "B'": return { axis: 'z', layer: -1, angle: 90 };
+                default:   return null;
+            }
+        }
+
+        function updateCubieGridCoords(cubie, axis, angle) {
+            const rad = (angle * Math.PI) / 180;
+            const c = Math.round(Math.cos(rad));
+            const s = Math.round(Math.sin(rad));
+            const { x, y, z } = cubie;
+
+            if (axis === 'x') { cubie.y = y * c - z * s; cubie.z = y * s + z * c; }
+            else if (axis === 'y') { cubie.x = x * c + z * s; cubie.z = -x * s + z * c; }
+            else if (axis === 'z') { cubie.x = x * c - y * s; cubie.y = x * s + y * c; }
+        }
+
+        function easeOutQuint(t) { return 1 - Math.pow(1 - t, 5); }
+
+        function executeLayerTurn(notation, duration = 320) {
+            const spec = getMoveSpec(notation);
+            if (!spec) return;
+
+            isTurning = true;
+            currentMoveText.textContent = isFrozen ? `Manual: ${notation}` : `Berputar: ${notation}`;
+
+            const layerCubies = cubieList.filter(c => c[spec.axis] === spec.layer);
+            const pivot = document.createElement('div');
+            pivot.style.transformStyle = 'preserve-3d';
+            pivot.style.position = 'absolute';
+            cubeAssembly.appendChild(pivot);
+            layerCubies.forEach(c => pivot.appendChild(c.el));
+
+            const startTime = performance.now();
+
+            function animateFrame(now) {
+                const elapsed = now - startTime;
+                const t = Math.min(elapsed / duration, 1);
+                const eased = easeOutQuint(t);
+                const deg = spec.angle * eased;
+
+                if (spec.axis === 'x') pivot.style.transform = `rotateX(${deg}deg)`;
+                else if (spec.axis === 'y') pivot.style.transform = `rotateY(${deg}deg)`;
+                else pivot.style.transform = `rotateZ(${deg}deg)`;
+
+                if (t < 1) requestAnimationFrame(animateFrame);
+                else {
+                    const finalRotMat = matRotate(spec.axis, spec.angle);
+                    layerCubies.forEach(c => {
+                        c.matrix = matMul(finalRotMat, c.matrix);
+                        c.el.style.transform = toMatrix3dString(c.matrix);
+                        updateCubieGridCoords(c, spec.axis, spec.angle);
+                        cubeAssembly.appendChild(c.el);
+                    });
+                    pivot.remove();
+                    isTurning = false;
+                    drainMoveQueue();
+                }
+            }
+            requestAnimationFrame(animateFrame);
+        }
+
+        function drainMoveQueue() {
+            if (isTurning) return;
+            if (moveQueue.length > 0) {
+                const speed = moveQueue.length > 4 ? 160 : 270;
+                executeLayerTurn(moveQueue.shift(), speed);
+                return;
+            }
+            if (!isFrozen) {
+                clearTimeout(autoTimer);
+                autoTimer = setTimeout(() => {
+                    if (isFrozen || isTurning || moveQueue.length > 0) return;
+                    const move = autoMovesSequence[autoSeqIndex];
+                    autoSeqIndex = (autoSeqIndex + 1) % autoMovesSequence.length;
+                    executeLayerTurn(move, 350);
+                }, 240);
+            } else {
+                currentMoveText.textContent = 'Status: Diam';
+            }
+        }
+
+        function setFreezeState(freeze) {
+            isFrozen = freeze;
+            clearTimeout(autoTimer);
+
+            if (isFrozen) {
+                freezeBtnLabel.textContent = 'Gerakkan Rubik';
+                freezeIcon.className = 'fa-solid fa-play';
+                freezeToggleBtn.classList.remove('bg-amber-500', 'hover:bg-amber-600');
+                freezeToggleBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-700');
+                statusIndicator.classList.remove('animate-pulse', 'bg-emerald-500');
+                statusIndicator.classList.add('bg-amber-500');
+                if (!isTurning) currentMoveText.textContent = 'Status: Diam';
+            } else {
+                freezeBtnLabel.textContent = 'Diamkan Rubik';
+                freezeIcon.className = 'fa-solid fa-pause';
+                freezeToggleBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
+                freezeToggleBtn.classList.add('bg-amber-500', 'hover:bg-amber-600');
+                statusIndicator.classList.remove('bg-amber-500');
+                statusIndicator.classList.add('animate-pulse', 'bg-emerald-500');
+                drainMoveQueue();
+            }
+        }
+
+        function toggleFreezeMode() {
+            setFreezeState(!isFrozen);
+            showToast(isFrozen ? 'Rubik didiamkan (orbit & putaran berhenti)' : 'Rubik kembali berputar');
+        }
+
+        function enqueueMove(notation) {
+            moveQueue.push(notation);
+            if (!isTurning) {
+                clearTimeout(autoTimer);
+                drainMoveQueue();
+            }
+        }
+
+        function scrambleCube() {
+            const pool = ['U', "U'", 'R', "R'", 'F', "F'", 'L', 'D', 'B'];
+            for (let i = 0; i < 12; i++) moveQueue.push(pool[Math.floor(Math.random() * pool.length)]);
+            if (!isTurning) { clearTimeout(autoTimer); drainMoveQueue(); }
+        }
+
+        function resetCube() {
+            clearTimeout(autoTimer);
+            moveQueue = [];
+            isTurning = false;
+            autoSeqIndex = 0;
+            targetRotX = -25;
+            targetRotY = -36;
+            buildRubiksCube();
+            if (!isFrozen) drainMoveQueue();
+            else currentMoveText.textContent = 'Status: Diam (Direset)';
+        }
+
+        function testNotation(move) {
+            document.getElementById('home').scrollIntoView({ behavior: 'smooth' });
+            setTimeout(() => enqueueMove(move), 350);
+        }
+
+        function runDemoAlgorithm(moves) {
+            document.getElementById('home').scrollIntoView({ behavior: 'smooth' });
+            if (!isFrozen) setFreezeState(true);
+            setTimeout(() => moves.forEach(m => enqueueMove(m)), 400);
+        }
+
+        // Pointer Drag Camera Rotation
+        cubeViewport.addEventListener('pointerdown', (e) => {
+            isPointerDown = true;
+            lastPointerX = e.clientX;
+            lastPointerY = e.clientY;
+            cubeViewport.setPointerCapture(e.pointerId);
+        });
+
+        cubeViewport.addEventListener('pointermove', (e) => {
+            if (!isPointerDown) return;
+            const dx = e.clientX - lastPointerX;
+            const dy = e.clientY - lastPointerY;
+            lastPointerX = e.clientX;
+            lastPointerY = e.clientY;
+
+            targetRotY += dx * 0.85;
+            targetRotX = Math.max(-80, Math.min(80, targetRotX - dy * 0.85));
+        });
+
+        cubeViewport.addEventListener('pointerup', (e) => {
+            isPointerDown = false;
+            if (cubeViewport.hasPointerCapture(e.pointerId)) cubeViewport.releasePointerCapture(e.pointerId);
+        });
+
+        // =========================================================
+        // 5. MODAL MATERI TUTORIAL & PROGRESS
+        // =========================================================
+        const tutorialDetails = {
+            1: { title: 'Pengenalan Rubik 3x3', html: '<p>Pahami bahwa center tidak berpindah, edge memiliki 2 warna, dan corner 3 warna.</p>' },
+            2: { title: 'Notasi & Gerakan', moves: ['R', 'U', "R'", "U'"], html: '<p>Latih Sexy Move: R U R\' U\'. Gerakan dasar ini akan selalu digunakan.</p>' },
+            3: { title: 'Membuat White Cross', moves: ['F', 'F'], html: '<p>Buat pola Daisy (aster) di atas, lalu sejajarkan warna dan putar ke bawah.</p>' },
+            4: { title: 'First Layer', moves: ['R', 'U', "R'", "U'"], html: '<p>Masukkan corner putih ke bawah dengan R U R\' U\'.</p>' },
+            5: { title: 'Second Layer', moves: ['U', 'R', "U'", "R'", "U'", "F'", 'U', 'F'], html: '<p>Masukkan edge tanpa kuning ke baris tengah ke kiri atau kanan.</p>' },
+            6: { title: 'Last Layer', moves: ['F', 'R', 'U', "R'", "U'", "F'"], html: '<p>Buat cross kuning, ratakan dengan Sune, dan rapikan sisi samping.</p>' }
+        };
+
+        function openTutorialModal(stepNum) {
+            const data = tutorialDetails[stepNum];
+            if (!data) return;
+            document.getElementById('modal-step-badge').textContent = stepNum;
+            document.getElementById('modal-step-title').textContent = data.title;
+            document.getElementById('modal-step-body').innerHTML = data.html;
+
+            const simBtn = document.getElementById('modal-sim-btn');
+            if (data.moves) {
+                simBtn.classList.remove('hidden');
+                simBtn.onclick = () => { closeTutorialModal(); runDemoAlgorithm(data.moves); };
+            } else {
+                simBtn.classList.add('hidden');
+            }
+
+            document.getElementById('tutorial-modal').classList.add('open');
+        }
+
+        function closeTutorialModal() { document.getElementById('tutorial-modal').classList.remove('open'); }
+        function closeTutorialModalOnBackdrop(e) { if (e.target.id === 'tutorial-modal') closeTutorialModal(); }
+
+        function updateLearningProgress() {
+            const checkboxes = document.querySelectorAll('.step-checkbox');
+            let completed = 0;
+            checkboxes.forEach(cb => { if (cb.checked) completed++; });
+            const percent = Math.round((completed / checkboxes.length) * 100);
+
+            document.getElementById('tutorial-progress-bar').style.width = percent + '%';
+            document.getElementById('tutorial-progress-pct').textContent = percent + '%';
+            document.getElementById('nav-progress-text').textContent = percent + '%';
+            document.getElementById('nav-progress-mini-bar').style.width = percent + '%';
+        }
+
+        // =========================================================
+        // 6. QUIZ INTERAKTIF
+        // =========================================================
+        const quizData = [
+            { name: 'q1', correct: 'b', title: '1. Arti notasi U\'', explanation: 'Prime berarti putaran berlawanan jarum jam.' },
+            { name: 'q2', correct: 'c', title: '2. Bagian Rubik dengan 3 warna', explanation: 'Corner selalu memiliki 3 warna berbeda.' }
+        ];
+
+        function handleQuizSubmit(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            let score = 0;
+            quizData.forEach(item => { if (formData.get(item.name) === item.correct) score++; });
+            
+            e.target.classList.add('hidden');
+            document.getElementById('quiz-result').classList.remove('hidden');
+            document.getElementById('quiz-score').textContent = `${score} / ${quizData.length}`;
+            document.getElementById('quiz-feedback').textContent = score === quizData.length ? 'Sempurna!' : 'Terus berlatih!';
+        }
+
+        function resetQuiz() {
+            document.getElementById('quiz-form').reset();
+            document.getElementById('quiz-result').classList.add('hidden');
+            document.getElementById('quiz-form').classList.remove('hidden');
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            buildRubiksCube();
+            requestAnimationFrame(startOrbitLoop);
+            drainMoveQueue();
+        });
+    </script>
+</body>
+</html>
